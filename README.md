@@ -20,10 +20,6 @@ To adjust, test and run the project you will need :
 • multicycle Nios II processor
 • Quartus 
 
-## Deployment
-
-Add additional notes about how to deploy this on a live system
-
 ## Built With
 
 * [Quartus](https://www.intel.com/content/www/us/en/software/programmable/quartus-prime/download.html) - Software to run the project 
