@@ -1,56 +1,24 @@
-# Project Title
+# A snake game in Assembly
 
-One Paragraph of project description goes here
+The main goal of the project was to implement a simplified version of the well-known snake game in assembly language and run it on a niosII processor. To test the game we used a Gecko4Education and the software Quartus (more info bellow). Find the development step by step and more about Gecko or NiosII in .pdf.
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+This section describes the necessary steps to run the program on the Gecko4EPFL board :
+• Please use the NiosII CPU provided in the Quartus project quartus/GECKO.qpf .
+• Compile the Quartus project.
+• Program the FPGA.
+
+(There is a .pdf where you can find more information if you don't know how to do those steps)
 
 ### Prerequisites
 
-What things you need to install the software and how to install them
+To adjust, test and run the project you will need :
 
-```
-Give examples
-```
-
-### Installing
-
-A step by step series of examples that tell you how to get a development env running
-
-Say what the step will be
-
-```
-Give the example
-```
-
-And repeat
-
-```
-until finished
-```
-
-End with an example of getting some data out of the system or using it for a little demo
-
-## Running the tests
-
-Explain how to run the automated tests for this system
-
-### Break down into end to end tests
-
-Explain what these tests test and why
-
-```
-Give an example
-```
-
-### And coding style tests
-
-Explain what these tests test and why
-
-```
-Give an example
-```
+• nios2sim Simulator (Java 10)
+• Gecko4Education-EPFL 
+• multicycle Nios II processor
+• Quartus 
 
 ## Deployment
 
@@ -58,31 +26,11 @@ Add additional notes about how to deploy this on a live system
 
 ## Built With
 
-* [Dropwizard](http://www.dropwizard.io/1.0.2/docs/) - The web framework used
-* [Maven](https://maven.apache.org/) - Dependency Management
-* [ROME](https://rometools.github.io/rome/) - Used to generate RSS Feeds
-
-## Contributing
-
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
-
-## Versioning
-
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
+* [Quartus](https://www.intel.com/content/www/us/en/software/programmable/quartus-prime/download.html) - Software to run the project 
+* [NiosII](http://stpe.github.io/jniosemu/) - NiosII simulator (You can use the niosII.jar directly)
 
 ## Authors
 
-* **Billie Thompson** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
-
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
-
-## Acknowledgments
-
-* Hat tip to anyone whose code was used
-* Inspiration
-* etc
+* **Auguste Lefevre** - *Initial work* - [AugusteLEF](https://github.com/AugusteLef)
+* **Watine Marc** - *Initial work* - [MarcWatine](https://github.com/marcwatine)
 
