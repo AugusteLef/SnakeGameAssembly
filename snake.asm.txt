@@ -1,0 +1,551 @@
+.equ HEAD_X, 0x1000 ; snake head's position on x-axis 
+.equ HEAD_Y, 0x1004 ; snake head's position on y-axis 
+.equ TAIL_X, 0x1008 ; snake tail's position on x-axis 
+.equ TAIL_Y, 0x100C ; snake tail's position on y-axis 
+.equ SCORE, 0x1010 ; score address 
+.equ GSA, 0x1014 ; game state array 
+.equ LEDS, 0x2000 ; LED addresses 
+.equ SEVEN_SEGS, 0x1198 ; 7-segment display addresses 
+.equ RANDOM_NUM, 0x2010 ; Random number generator address 
+.equ BUTTONS, 0x2030 ; Button addresses 
+
+
+; BEGIN:main
+main:
+
+	initialize:
+	call restart_game
+	addi t0, zero, 1
+	beq v0, t0, loop_main
+	jmpi initialize
+
+	call loop_main
+
+	loop_main:
+	call clear_leds
+	call get_input
+	call hit_test
+	addi a0, zero, 0
+	addi t0, zero, 1
+	beq v0, t0, we_hit_food
+	back_whf:
+	addi t0, zero, 2
+	beq v0, t0, final_end
+	call move_snake
+	call draw_array
+	call display_score
+	call wait
+	call restart_game
+	call loop_main
+
+	we_hit_food:
+	addi a0, zero, 1
+	addi t0, zero, 1
+	ldw t0, SCORE(zero)
+	addi t0, t0, 1
+	stw t0, SCORE(zero)
+	addi t0, zero, 1
+	call create_food
+	addi t0, zero,1
+	jmpi back_whf
+	
+	final_end:
+	call draw_array
+	call restart_game
+	addi t0, zero, 1
+	beq v0, t0, loop_main
+	jmpi final_end
+
+
+	wait: 											;just a wait procedure
+	addi t0,zero, 0xFFF
+	addi t1, zero, 0x200
+	loop_wait:
+		addi t0,t0,-1
+		beq t0, zero, decrement_counter_wait
+		come_back_wait:
+		bne t1,zero, loop_wait
+		ret
+		decrement_counter_wait:
+		addi t1, t1, -1
+		addi t0, zero, 0xFFF
+		jmpi come_back_wait
+
+; END:main
+	
+
+
+
+; BEGIN:clear_leds
+clear_leds:
+	;store 0 in all 3 LED slots
+	stw zero, LEDS (zero)
+	stw zero, LEDS + 4 (zero) 
+	stw zero, LEDS + 8 (zero)
+	ret
+; END:clear_leds
+
+
+; BEGIN:set_pixel
+set_pixel:
+	;translation from x*y to the array of each LED (1 shiftedLeft by x*8 + y)
+	slli t0, a0, 3
+	add t0, t0, a1 
+	addi t2, zero, 1
+	sll t1, t2, t0				 	
+										; if the number stored in a0 (x coord of the led to open) is < 4 : LED1, <8 :led2, <12 :led3
+	addi t0, zero, 4
+	blt a0, t0, led1_set_pixel
+	addi t0, t0, 4
+	blt a0, t0, led2_set_pixel
+	addi t0, t0, 4
+	blt a0, t0, led3_set_pixel
+	ret
+	;auxiliary function
+	led1_set_pixel:						; gets the current value of Led and puts the correct bit to 1 if it wasnt (with or)
+		ldw t4, LEDS (zero)
+		or t1, t1, t4
+		stw t1, LEDS (zero)
+		ret
+	;auxiliary function
+	led2_set_pixel:
+		ldw t4, LEDS + 4 (zero)
+		or t1, t1, t4
+		stw t1, LEDS + 4 (zero)
+		ret
+	;auxiliary function
+	led3_set_pixel:
+		ldw t4, LEDS + 8 (zero)
+		or t1, t1, t4
+		stw t1, LEDS + 8 (zero)
+		ret
+; END:set_pixel
+
+; BEGIN:get_input
+get_input:
+	; Find value ox x and y position, the boutton pressed, initialize the edge do 0 and fin the value of the GSA at the correct position
+	ldw t0, HEAD_X (zero)
+	ldw t1, HEAD_Y	(zero)
+	ldw t6, BUTTONS + 4 (zero)	;here is the value of the edgeCapture --> t6 used in the cases
+	stw zero, BUTTONS + 4 (zero) ;renitalise edgecapture a 0
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2 
+	ldw t0, GSA (t2)			;t0 has the direction in which the head is going atm
+
+	;Check the value of the GSA at the correct position and choose the correct case
+	addi t1, zero, 1
+	beq t0, t1, case1_get_input
+	addi t1, t1, 1
+	beq t0, t1, case2_get_input
+	addi t1, t1, 1		
+	beq t0, t1, case3_get_input
+	addi t1, t1, 1
+	beq t0, t1, case4_get_input
+	ret ;; RET mmmmh
+
+	; Case depending of the value of GSA at the correct position and of our priority order
+	case1_get_input: 
+		andi t7, t6, 2  
+		bne t7, zero, changeUp_get_input
+		andi t7, t6, 4
+		bne t7, zero, changeDown_get_input
+		ret
+	case2_get_input:
+		andi t7, t6, 1  
+		bne t7, zero, changeLeft_get_input
+		andi t7, t6, 8
+		bne t7, zero, changeRight_get_input
+		ret
+	case3_get_input:
+		andi t7, t6, 1 
+		bne t7, zero, changeLeft_get_input
+		andi t7, t6, 8
+		bne t7, zero, changeRight_get_input
+		ret
+	case4_get_input:
+		andi t7, t6, 2  
+		bne t7, zero, changeUp_get_input
+		andi t7, t6, 4
+		bne t7, zero, changeDown_get_input
+		ret
+
+	; Save the new direction value in GSA at the correct position
+	changeLeft_get_input:
+		addi t0, zero, 1
+		stw t0, GSA(t2)
+		ret
+	changeUp_get_input:
+		addi t0, zero, 2
+		stw t0, GSA(t2)
+		ret
+	changeDown_get_input:
+		addi t0, zero, 3
+		stw t0, GSA(t2)
+		ret
+	changeRight_get_input:
+		addi t0, zero, 4
+		stw t0, GSA(t2)
+		ret
+; END:get_input
+
+; BEGIN:move_snake
+move_snake:
+	;Find positions and the new direction to follow
+	ldw t0, HEAD_X (zero)
+	ldw t1, HEAD_Y	(zero)
+	ldw t4, TAIL_X (zero)
+	ldw t5, TAIL_Y (zero)
+	slli t2, t0, 3								;new positions for head and tail
+	slli t6, t4, 3
+	add t2, t2, t1
+	slli t2, t2, 2 
+	add t6, t6, t5
+	slli t6, t6, 2
+	ldw t3, GSA (t2)
+
+	;Change the head position depending on where the snake is going
+	addi t7, zero, 1
+	beq t3, t7 , changeHeadLeft_move_snake
+	addi t7, t7, 1
+	beq t3, t7, changeHeadUp_move_snake
+	addi t7, t7, 1		
+	beq t3, t7, changeHeadDown_move_snake
+	addi t7, t7, 1
+	beq t3, t7, changeHeadRight_move_snake
+
+	check_tail_move_snake:						;check weather the tail need to be erased or not
+	beq a0, zero, eraseTail_move_snake 
+	ret
+
+	changeHeadLeft_move_snake:					;add -1 to headx and let heady the same. 
+	addi t2, t0 , -1
+	stw t2, HEAD_X (zero)
+	ldw t3, HEAD_Y (zero)
+	slli t4, t2, 3
+	add t4, t4, t3
+	slli t4, t4, 2 
+	addi t5, zero, 1							;put the new direction in the new head position in the gsa (was 0 or 5 before!)
+	stw t5, GSA(t4)
+	jmpi check_tail_move_snake
+
+	changeHeadUp_move_snake:
+	addi t2, t1, -1
+	stw t2, HEAD_Y (zero)
+	ldw t3, HEAD_X (zero)
+	slli t4, t3, 3
+	add t4, t4, t2
+	slli t4, t4, 2 
+	addi t5, zero, 2
+	stw t5, GSA(t4)
+	jmpi check_tail_move_snake
+
+	changeHeadDown_move_snake:
+	addi t2, t1 , 1
+	stw t2, HEAD_Y (zero)
+	ldw t3, HEAD_X (zero)
+	slli t4, t3, 3
+	add t4, t4, t2
+	slli t4, t4, 2
+	addi t5, zero, 3
+	stw t5, GSA(t4)
+	jmpi check_tail_move_snake
+
+	changeHeadRight_move_snake:
+	addi t2, t0, 1
+	stw t2, HEAD_X (zero)
+	ldw t3, HEAD_Y (zero)
+	slli t4, t2, 3
+	add t4, t4, t3
+	slli t4, t4, 2
+	addi t5, zero, 4
+	stw t5, GSA(t4)
+	jmpi check_tail_move_snake
+
+	eraseTail_move_snake:						
+	ldw t3, GSA (t6)
+	stw zero, GSA(t6)							;erase it
+	addi t7, zero, 1							; and then move the tailx taily accordingly with changeTail-dir-
+	beq t3, t7 , changeTailLeft_move_snake
+	addi t7, t7, 1
+	beq t3, t7, changeTailUp_move_snake
+	addi t7, t7, 1		
+	beq t3, t7, changeTailDown_move_snake
+	addi t7, t7, 1
+	beq t3, t7, changeTailRight_move_snake
+	ret
+
+	; add or sub 1 at x or y of tail 
+	changeTailLeft_move_snake:
+	ldw t4, TAIL_X(zero)
+	addi t3, t4 , -1
+	stw t3, TAIL_X (zero)
+	ret	
+	
+	changeTailUp_move_snake:
+	ldw t5, TAIL_Y(zero)
+	addi t3, t5, -1
+	stw t3, TAIL_Y (zero)
+	ret
+	
+	changeTailDown_move_snake:
+	ldw t5, TAIL_Y(zero)
+	addi t3, t5 , 1
+	stw t3, TAIL_Y (zero)
+	ret
+
+	changeTailRight_move_snake:
+	ldw t4, TAIL_X(zero)
+	addi t3, t4, 1
+	stw t3, TAIL_X (zero)
+	ret
+; END:move_snake
+
+; BEGIN:draw_array
+draw_array:
+
+	;if snake didn't eat --> erase tail
+	;if snake ate, set next food
+	addi t0, zero, 0							;the end of line values
+	addi t6, zero, 12
+	addi t5, zero, 8
+	jmpi loop_x_draw_array
+	ret
+	loop_x_draw_array:							;for all leds, we check weather we need to set_pixel or not
+	addi t1, zero, 0
+	blt t0, t6, loop_y_draw_array
+	ret
+	
+	loop_y_draw_array:
+	slli t2, t0, 3
+	add t3, t2, t1
+	slli t3, t3, 2
+	ldw t4, GSA(t3)
+	bne t4, zero, stack_draw_array				; check weather in this x*y there is a value different to 0 and if there is, call
+	come_back_draw_array:
+	addi t1, t1,1
+	blt t1, t5, loop_y_draw_array
+	addi t0, t0,1
+	jmpi loop_x_draw_array
+	
+	
+	stack_draw_array:							; use the stackpointer to save the value of registers ra, a1, a0
+	
+	addi sp, sp, -12 
+	stw ra, 0(sp)
+	stw a1, 4(sp)
+	stw a0, 8(sp)
+
+	addi a0, t0, 0
+	addi a1, t1, 0
+	
+	call set_pixel								; set the led pixel to 1 
+
+	addi t0,a0,0
+	addi t1,a1,0
+
+	ldw a0, 8(sp) ; same b4
+	ldw a1, 4(sp)
+	ldw ra, 0(sp)
+	addi sp, sp, 12
+	jmpi come_back_draw_array
+
+; END:draw_array	
+
+; BEGIN:create_food
+create_food:									; set a random index in the GSA to 5 (food). Will be drawn when drawarray is called
+	addi t1, zero, 95
+	loop_generate_create_food:
+	ldw t0, RANDOM_NUM(zero)
+	andi t0, t0, 255
+	bge t0, t1, loop_generate_create_food	
+	slli t0, t0, 2
+	ldw t3 ,GSA(t0)
+	bne t3, zero, loop_generate_create_food
+	addi t2,zero,5
+	stw t2, GSA(t0)
+	ret
+; END:create_food
+
+; BEGIN:hit_test
+hit_test:										; return v0: 0 (no collision), 1(score increment, foodCollision), 2 (endgame, wall or itselfCollision)
+
+	addi v0, zero, 0
+	ldw t0, HEAD_X(zero)
+	ldw t1, HEAD_Y(zero)
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2
+	ldw t3, GSA(t2)								;check what value is in the GSA at head position to see which direction it is going
+	addi t4, zero, 1
+	beq t3, t4, next_left_hit_test				
+	addi t4, t4, 1
+	beq t3, t4, next_up_hit_test
+	addi t4, t4, 1
+	beq t3, t4, next_down_hit_test
+	addi t4, t4, 1
+	beq t3, t4, next_right_hit_test
+	ret
+ 
+	next_left_hit_test:							; check what is in the next position.
+	addi t0, t0, -1
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2
+	ldw t3, GSA(t2)
+	jmpi check_nextpos_hit_test
+	
+	next_up_hit_test:
+	addi t1, t1, -1
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2
+	ldw t3, GSA(t2)
+	jmpi check_nextpos_hit_test
+
+	next_down_hit_test:
+	addi t1, t1, 1
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2
+	ldw t3, GSA(t2)
+	jmpi check_nextpos_hit_test
+
+	next_right_hit_test:
+	addi t0, t0, 1
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2
+	ldw t3, GSA(t2)
+	jmpi check_nextpos_hit_test
+	
+	check_nextpos_hit_test:						; check weather it is food a wall or itself
+	blt t0, zero, hit_bound_or_himself_hit_test
+	blt t1, zero, hit_bound_or_himself_hit_test
+	addi t4, zero, 12
+	bge t0, t4, hit_bound_or_himself_hit_test
+	addi t4, zero, 8
+	bge t1, t4, hit_bound_or_himself_hit_test
+	addi t4, zero, 1
+	beq t3, t4, hit_bound_or_himself_hit_test
+	addi t4, zero, 2
+	beq t3, t4, hit_bound_or_himself_hit_test
+	addi t4, zero, 3
+	beq t3, t4, hit_bound_or_himself_hit_test
+	addi t4, zero, 4
+	beq t3, t4, hit_bound_or_himself_hit_test
+	addi t4, zero, 5
+	beq t3, t4, hit_food_hit_test
+	ret
+
+	hit_food_hit_test:							; it's food!
+	addi v0, zero, 1
+	stw zero, GSA(t2)
+	ret	
+	hit_bound_or_himself_hit_test:				; it's a game over param! :(
+	addi v0, zero, 2
+	ret
+; END:hit_test
+
+; BEGIN:display_score
+display_score:
+	ldw t0, SCORE(zero)
+
+	addi t2, t0, 0 
+	addi t3, zero, 10
+	addi t4, zero, 0								 ; compteur dzaines
+	get_unites_display_score:
+	blt t2, t3, unites_and_dizaines_is_display_score
+	addi t2, t2, -10
+	addi t4, t4, 4
+	jmpi get_unites_display_score
+	
+	unites_and_dizaines_is_display_score:
+	slli t2, t2, 2
+	ldw t1, font_data(t2) 
+	stw t1, SEVEN_SEGS + 12(zero)
+	ldw t1, font_data(t4)
+	stw t1, SEVEN_SEGS +8(zero)
+
+	dizaines_is_display_score:						;put zero in tghe first 2 segs
+	addi t1, zero, 0xFC
+	stw t1, SEVEN_SEGS(zero)
+	stw t1, SEVEN_SEGS + 4(zero)
+	ret
+; END:display_score
+
+; BEGIN:restart_game
+restart_game:
+	ldw t0, BUTTONS + 4 (zero)						; get the info on the restart buton and reset it to 0
+	andi t1, t0, 16
+	bne t1, zero, really_restart
+	addi v0, zero, 0
+	ret
+	really_restart:
+	addi sp, zero, LEDS ;initalise sp
+	stw zero, BUTTONS + 4 (zero)
+	addi sp, sp, -4
+	stw ra, 0(sp)
+
+	addi t0, zero, 0
+	addi t1, zero, 0
+	addi t2, zero, 96
+	loop_to_zero:
+	stw zero, GSA(t0)
+	addi t0, t0, 4
+	addi t1, t1, 1
+	blt t1, t2, loop_to_zero
+
+	stw zero, SCORE(zero)
+	addi t1, zero, 0xFC
+	stw t1, SEVEN_SEGS(zero)
+	stw t1, SEVEN_SEGS + 4(zero)
+	stw t1, SEVEN_SEGS + 8(zero)
+	stw t1, SEVEN_SEGS + 12(zero)
+
+	stw zero, HEAD_X(zero)							;Place le snake en haut a gauche et indique la direction DROITE, set score à zero
+	stw zero, HEAD_Y(zero)
+	stw zero, TAIL_X(zero)
+	stw zero, TAIL_Y(zero)
+	stw zero, SCORE(zero)
+	addi t0, zero, 4
+	stw t0, GSA(zero)
+
+	call clear_leds
+	call create_food	;Create the first food
+	call draw_array
+	call wait_2
+
+	ldw ra, 0(sp)
+	addi sp, sp, 4
+	addi sp, zero, LEDS ;initalise sp
+	addi v0, zero, 1
+	ret	
+
+	wait_2: 											;just a wait procedure
+	addi t0,zero, 0xFFF
+	addi t1, zero, 0x200
+	loop_wait_2:
+		addi t0,t0,-1
+		beq t0, zero, decrement_counter_wait_2
+		come_back_wait_2:
+		bne t1,zero, loop_wait_2
+		ret
+		decrement_counter_wait_2:
+		addi t1, t1, -1
+		addi t0, zero, 0xFFF
+		jmpi come_back_wait_2
+; END:restart_game
+
+font_data: 
+	.word 0xFC ; 0 
+	.word 0x60 ; 1 
+	.word 0xDA ; 2 
+	.word 0xF2 ; 3 
+	.word 0x66 ; 4 
+	.word 0xB6 ; 5 
+	.word 0xBE ; 6 
+	.word 0xE0 ; 7 
+	.word 0xFE ; 8 
+	.word 0xF6 ; 9
+
